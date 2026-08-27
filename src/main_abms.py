@@ -4,6 +4,12 @@ import pandas as pd
 from pathlib import Path
 
 RANDOM_SEED = 42
+DEFAULT_GRID_WIDTH = 50
+DEFAULT_GRID_HEIGHT = 50
+DEFAULT_FOOD_DEMAND = 300
+DEFAULT_GROCERY_DEMAND = 200
+DEFAULT_NUM_DRIVERS = 5
+DEFAULT_SIMULATION_TICKS = 1440
 
 ROOT = Path(__file__).resolve().parent.parent
 FOOD_DEMAND_CSV = ROOT / "dataset" / "food_hourly_demand_profile.csv"
@@ -859,20 +865,18 @@ class FoodGenerator:
         schedule = np.zeros(1440, dtype=int)
 
         for hour, count in enumerate(hourly_orders):
-            if count > 60:
-                raise ValueError(
-                    "Hourly order count exceeds 60, but the current schedule "
-                    "supports at most one order per minute."
-                )
-
             if count > 0:
                 start = hour * 60
-                ticks = self.rng.choice(
-                    range(start, start + 60),
-                    size=count,
-                    replace=False, # False supaya tidak terjadi duplikasi dalam menit yang sama
-                )
-                schedule[ticks] = 1
+                base_per_minute, remainder = divmod(count, 60)
+                schedule[start:start + 60] = base_per_minute
+
+                if remainder > 0:
+                    ticks = self.rng.choice(
+                        range(start, start + 60),
+                        size=remainder,
+                        replace=False,
+                    )
+                    schedule[ticks] += 1
 
         return schedule.tolist()
 
@@ -910,20 +914,18 @@ class GroceryGenerator:
         schedule = np.zeros(1440, dtype=int)
 
         for hour, count in enumerate(hourly_orders):
-            if count > 60:
-                raise ValueError(
-                    "Hourly order count exceeds 60, but the current schedule "
-                    "supports at most one order per minute."
-                )
-
             if count > 0:
                 start = hour * 60
-                ticks = self.rng.choice(
-                    range(start, start + 60),
-                    size=count,
-                    replace=False, # False supaya tidak terjadi duplikasi dalam menit yang sama
-                )
-                schedule[ticks] = 1
+                base_per_minute, remainder = divmod(count, 60)
+                schedule[start:start + 60] = base_per_minute
+
+                if remainder > 0:
+                    ticks = self.rng.choice(
+                        range(start, start + 60),
+                        size=remainder,
+                        replace=False,
+                    )
+                    schedule[ticks] += 1
 
         return schedule.tolist()
 
@@ -945,11 +947,11 @@ class BaselineModel(mesa.Model):
 
     def __init__(
             self,
-            width: int = 50,
-            height: int = 50,
-            total_food_demand: int = 100,
-            total_grocery_demand: int = 50,
-            num_driver: int = 5,
+            width: int = DEFAULT_GRID_WIDTH,
+            height: int = DEFAULT_GRID_HEIGHT,
+            total_food_demand: int = DEFAULT_FOOD_DEMAND,
+            total_grocery_demand: int = DEFAULT_GROCERY_DEMAND,
+            num_driver: int = DEFAULT_NUM_DRIVERS,
             dispatcher_mode: str = "separated",
             seed: int = RANDOM_SEED,
     ):
@@ -1001,10 +1003,10 @@ class BaselineModel(mesa.Model):
         current_tick = self.tick_counter
 
         # 1. Spawn new agents based on minute-of-day demand schedule.
-        if self.food_schedule[minute_in_day] == 1:
+        for _ in range(self.food_schedule[minute_in_day]):
             self._spawn_restaurant(current_tick)
 
-        if self.grocery_schedule[minute_in_day] == 1:
+        for _ in range(self.grocery_schedule[minute_in_day]):
             self._spawn_grocery(current_tick)
 
         # 2. Expire overdue UNASSIGNED orders before Dispatcher can assign them.
@@ -1167,10 +1169,10 @@ def _collect_driver_metrics(model):
 
 
 if __name__ == "__main__":
-    FOOD_DEMAND = 1000
-    GROCERY_DEMAND = 1000
-    NUM_DRIVER = 5
-    SIMULATION_TICKS = 1440
+    FOOD_DEMAND = DEFAULT_FOOD_DEMAND
+    GROCERY_DEMAND = DEFAULT_GROCERY_DEMAND
+    NUM_DRIVER = DEFAULT_NUM_DRIVERS
+    SIMULATION_TICKS = DEFAULT_SIMULATION_TICKS
 
     print(f"{'=' * 60}")
     print("SEPARATED MODE")

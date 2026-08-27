@@ -19,6 +19,12 @@ from matplotlib.widgets import Button, Slider
 import numpy as np
 
 from main_abms import (
+    DEFAULT_FOOD_DEMAND,
+    DEFAULT_GRID_HEIGHT,
+    DEFAULT_GRID_WIDTH,
+    DEFAULT_GROCERY_DEMAND,
+    DEFAULT_NUM_DRIVERS,
+    DEFAULT_SIMULATION_TICKS,
     RANDOM_SEED,
     BaselineModel,
     Customer,
@@ -56,7 +62,7 @@ class GridVisualizer:
     def __init__(
         self,
         model: BaselineModel,
-        simulation_ticks: int = 1440,
+        simulation_ticks: int = DEFAULT_SIMULATION_TICKS,
         interval_ms: int = 50,
         model_factory: Callable[[], BaselineModel] | None = None,
         show_driver_ids: bool = True,
@@ -223,9 +229,32 @@ class GridVisualizer:
             labelspacing=0.65,
             handletextpad=0.7,
         )
+        self.info_axis.text(
+            0,
+            0.68,
+            "SIMULATION TIME",
+            transform=self.info_axis.transAxes,
+            va="top",
+            ha="left",
+            fontsize=9,
+            fontweight="bold",
+            color="#555555",
+        )
+        self.clock_text = self.info_axis.text(
+            0,
+            0.63,
+            "",
+            transform=self.info_axis.transAxes,
+            va="top",
+            ha="left",
+            fontsize=16,
+            fontweight="bold",
+            family="monospace",
+            color="#111111",
+        )
         self.info_text = self.info_axis.text(
             0,
-            0.56,
+            0.49,
             "",
             transform=self.info_axis.transAxes,
             va="top",
@@ -234,17 +263,6 @@ class GridVisualizer:
             family="monospace",
             linespacing=1.25,
             color="#222222",
-        )
-        self.info_axis.text(
-            0,
-            0.02,
-            "Co-located markers are slightly offset.",
-            transform=self.info_axis.transAxes,
-            va="bottom",
-            ha="left",
-            fontsize=8,
-            color="#666666",
-            linespacing=1.25,
         )
 
     def _setup_controls(self) -> None:
@@ -330,12 +348,11 @@ class GridVisualizer:
     def _mean_or_zero(values: List[float]) -> float:
         return float(sum(values) / len(values)) if values else 0.0
 
-    def _format_clock(self) -> str:
-        tick = self.model.tick_counter
-        day = (tick // 1440) + 1
-        minute_in_day = tick % 1440
-        hour, minute = divmod(minute_in_day, 60)
-        return f"Day {day} {hour:02d}:{minute:02d}"
+    @staticmethod
+    def _format_clock(tick: int) -> str:
+        """Convert elapsed simulation minutes to a one-day HH:MM clock."""
+        hour, minute = divmod(tick, 60)
+        return f"{hour:02d}:{minute:02d}"
 
     def _sync_driver_labels(
         self,
@@ -432,9 +449,9 @@ class GridVisualizer:
         )
 
         progress = min(self.model.tick_counter / self.simulation_ticks, 1.0)
+        self.clock_text.set_text(self._format_clock(self.model.tick_counter))
         self.status_title.set_text(
-            f"{mode}  •  {self._format_clock()}  •  "
-            f"Tick {self.model.tick_counter:,}/{self.simulation_ticks:,} "
+            f"{mode}  •  Tick {self.model.tick_counter:,}/{self.simulation_ticks:,} "
             f"({progress:.1%})  •  {self._run_state}"
         )
 
@@ -487,7 +504,7 @@ class GridVisualizer:
             )
         )
         self._update_dashboard(spatial_agents)
-        artists.extend((self.status_title, self.info_text))
+        artists.extend((self.status_title, self.clock_text, self.info_text))
         return tuple(artists)
 
     def _init_frame(self):
@@ -620,17 +637,24 @@ def parse_args() -> argparse.Namespace:
         default="integrated",
         help="Dispatcher policy to visualize (default: integrated).",
     )
-    parser.add_argument("--width", type=int, default=50)
-    parser.add_argument("--height", type=int, default=50)
-    parser.add_argument("--food-demand", type=int, default=100)
-    parser.add_argument("--grocery-demand", type=int, default=50)
+    parser.add_argument("--width", type=int, default=DEFAULT_GRID_WIDTH)
+    parser.add_argument("--height", type=int, default=DEFAULT_GRID_HEIGHT)
+    parser.add_argument("--food-demand", type=int, default=DEFAULT_FOOD_DEMAND)
+    parser.add_argument(
+        "--grocery-demand",
+        type=int,
+        default=DEFAULT_GROCERY_DEMAND,
+    )
     parser.add_argument(
         "--drivers",
         type=int,
-        default=5,
-        help="Number of Drivers in this configurable scenario (default: 5).",
+        default=DEFAULT_NUM_DRIVERS,
+        help=(
+            "Number of Drivers in this configurable scenario "
+            f"(default: {DEFAULT_NUM_DRIVERS})."
+        ),
     )
-    parser.add_argument("--ticks", type=int, default=1440)
+    parser.add_argument("--ticks", type=int, default=DEFAULT_SIMULATION_TICKS)
     parser.add_argument(
         "--interval-ms",
         type=int,
