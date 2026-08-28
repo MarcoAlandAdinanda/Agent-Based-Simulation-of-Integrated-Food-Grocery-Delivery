@@ -157,7 +157,7 @@ class GridVisualizer:
             color="#D55E00",
             edgecolor="white",
             linewidth=0.7,
-            label="Food order / restaurant",
+            label="Food order",
             zorder=5,
         )
         self.grocery_scatter = self.axis.scatter(
